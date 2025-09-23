@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"log/slog"
+	"love-signal-geo-data/internal/app"
 	"love-signal-geo-data/internal/config"
 	"love-signal-geo-data/pkg/logger"
 )
@@ -12,4 +14,13 @@ func main() {
 	log := logger.SetupLogger(cfg.Env)
 
 	log.Info("starting application", slog.Any("config", cfg))
+
+	application := app.New(log, cfg)
+
+	go func() {
+		application.Start(context.Background())
+	}()
+
+	application.GracefulStop()
+	log.Info("application stopped")
 }
