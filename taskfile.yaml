@@ -1,0 +1,9 @@
+version: '3'
+
+tasks:
+  dev:
+    aliases:
+      - dev
+    desc: 'run geo-data app with local config'
+    cmds:
+      - go run ./cmd/geodata --config=./config/local.yaml
