@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"love-signal-geo-data/internal/app/kafka"
 	"love-signal-geo-data/internal/config"
+	"love-signal-geo-data/internal/infrastructure/kafka/handlers"
 	"os"
 	"os/signal"
 	"syscall"
@@ -21,7 +22,11 @@ func New(
 	log *slog.Logger,
 	cfg *config.Config,
 ) *App {
-	kafkaApp := kafka.New(log, cfg.Kafka)
+	// Handlers.
+	userCoordinatesHandler := handlers.NewUserCoordinates(log)
+
+	// Apps.
+	kafkaApp := kafka.New(log, cfg.Kafka, userCoordinatesHandler)
 
 	return &App{
 		log:      log,

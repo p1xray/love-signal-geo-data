@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"love-signal-geo-data/internal/config"
+	"love-signal-geo-data/internal/infrastructure/kafka/handlers"
 	"love-signal-geo-data/pkg/kafka"
 	"love-signal-geo-data/pkg/logger/sl"
 	"strings"
@@ -16,22 +17,33 @@ type App struct {
 	producer  *kafka.Producer
 	consumers []*kafka.Consumer
 	input     chan kafka.Message
+
+	userCoordinatesHandler UserCoordinatesHandler
 }
 
 // New returns new instance of kafka queue application.
 func New(
 	log *slog.Logger,
 	cfg config.KafkaConfig,
+	userCoordinatesHandler UserCoordinatesHandler,
 ) *App {
 	address := strings.Split(cfg.Address, ",")
 
 	producer := kafka.NewAsyncProducer(address, kafka.AcksRequireAll())
 
+	userCoordinatesConsumer := kafka.NewConsumerGroup(
+		address,
+		cfg.UserCoordinatesTopic.GroupID,
+		cfg.UserCoordinatesTopic.Topic,
+		kafka.AutoCommitOffset(),
+	)
+
 	return &App{
-		log:       log,
-		producer:  producer,
-		consumers: []*kafka.Consumer{},
-		input:     make(chan kafka.Message),
+		log:                    log,
+		producer:               producer,
+		consumers:              []*kafka.Consumer{userCoordinatesConsumer},
+		input:                  make(chan kafka.Message),
+		userCoordinatesHandler: userCoordinatesHandler,
 	}
 }
 
@@ -122,6 +134,12 @@ func (a *App) handleConsumerReceivedMessages(ctx context.Context) {
 					log.Info("received message from kafka", slog.String("topic", msg.Topic))
 
 					switch msg.Topic {
+					case handlers.UserCoordinatesTopic:
+						go func() {
+							if err := a.userCoordinatesHandler.Execute(ctx, msg.Data); err != nil {
+								log.Error("error handling new user coordinates from kafka", sl.Err(err))
+							}
+						}()
 					default:
 						log.Warn("handler implementation for topic does not exist", slog.String("topic", msg.Topic))
 					}

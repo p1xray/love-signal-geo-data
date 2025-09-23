@@ -15,7 +15,14 @@ type Config struct {
 
 // KafkaConfig is the kafka configuration.
 type KafkaConfig struct {
-	Address string `yaml:"address" env-required:"true"`
+	Address              string      `yaml:"address" env-required:"true"`
+	UserCoordinatesTopic TopicConfig `yaml:"user_coordinates_topic" env-required:"true"`
+}
+
+// TopicConfig is the kafka topic configuration.
+type TopicConfig struct {
+	GroupID string `yaml:"group_id" env-required:"true"`
+	Topic   string `yaml:"topic" env-required:"true"`
 }
 
 // MustLoad loads config and panics if any error occurs.
