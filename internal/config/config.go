@@ -9,7 +9,13 @@ import (
 
 // Config is the project configuration.
 type Config struct {
-	Env string `yaml:"env" env-default:"local"`
+	Env   string      `yaml:"env" env-default:"local"`
+	Kafka KafkaConfig `yaml:"kafka" env-required:"true"`
+}
+
+// KafkaConfig is the kafka configuration.
+type KafkaConfig struct {
+	Address string `yaml:"address" env-required:"true"`
 }
 
 // MustLoad loads config and panics if any error occurs.

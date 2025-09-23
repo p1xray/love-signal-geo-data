@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"log/slog"
+	"love-signal-geo-data/internal/app/kafka"
 	"love-signal-geo-data/internal/config"
 	"os"
 	"os/signal"
@@ -11,7 +12,8 @@ import (
 
 // App is an application.
 type App struct {
-	log *slog.Logger
+	log      *slog.Logger
+	kafkaApp *kafka.App
 }
 
 // New creates a new application.
@@ -19,8 +21,11 @@ func New(
 	log *slog.Logger,
 	cfg *config.Config,
 ) *App {
+	kafkaApp := kafka.New(log, cfg.Kafka)
+
 	return &App{
-		log: log,
+		log:      log,
+		kafkaApp: kafkaApp,
 	}
 }
 
@@ -30,6 +35,8 @@ func (a *App) Start(ctx context.Context) {
 
 	log := a.log.With(slog.String("op", op))
 	log.Info("starting application")
+
+	a.kafkaApp.Start(ctx)
 }
 
 // GracefulStop - gracefully stops the application.
@@ -47,4 +54,6 @@ func (a *App) GracefulStop() {
 	}
 
 	log.Info("stopping application")
+
+	a.kafkaApp.Stop()
 }
