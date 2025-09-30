@@ -3,8 +3,8 @@ package kafka
 import "context"
 
 type (
-	// UserCoordinatesHandler is a handler for getting new user coordinates.
-	UserCoordinatesHandler interface {
+	// UserCoordinatesUseCase is a use-case for processing new user coordinates.
+	UserCoordinatesUseCase interface {
 		// Execute processes the received new user coordinates.
 		Execute(ctx context.Context, dataAsBytes []byte) error
 	}

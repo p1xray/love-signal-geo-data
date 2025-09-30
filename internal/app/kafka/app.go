@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"love-signal-geo-data/internal/config"
-	"love-signal-geo-data/internal/infrastructure/kafka/handlers"
+	infrKafka "love-signal-geo-data/internal/infrastructure/kafka"
 	"love-signal-geo-data/pkg/kafka"
 	"love-signal-geo-data/pkg/logger/sl"
 	"strings"
@@ -18,14 +18,14 @@ type App struct {
 	consumers []*kafka.Consumer
 	input     chan kafka.Message
 
-	userCoordinatesHandler UserCoordinatesHandler
+	userCoordinatesUseCase UserCoordinatesUseCase
 }
 
 // New returns new instance of kafka queue application.
 func New(
 	log *slog.Logger,
 	cfg config.KafkaConfig,
-	userCoordinatesHandler UserCoordinatesHandler,
+	userCoordinatesUseCase UserCoordinatesUseCase,
 ) *App {
 	address := strings.Split(cfg.Address, ",")
 
@@ -43,7 +43,7 @@ func New(
 		producer:               producer,
 		consumers:              []*kafka.Consumer{userCoordinatesConsumer},
 		input:                  make(chan kafka.Message),
-		userCoordinatesHandler: userCoordinatesHandler,
+		userCoordinatesUseCase: userCoordinatesUseCase,
 	}
 }
 
@@ -134,9 +134,9 @@ func (a *App) handleConsumerReceivedMessages(ctx context.Context) {
 					log.Info("received message from kafka", slog.String("topic", msg.Topic))
 
 					switch msg.Topic {
-					case handlers.UserCoordinatesTopic:
+					case infrKafka.UserCoordinatesTopic:
 						go func() {
-							if err := a.userCoordinatesHandler.Execute(ctx, msg.Data); err != nil {
+							if err := a.userCoordinatesUseCase.Execute(ctx, msg.Data); err != nil {
 								log.Error("error handling new user coordinates from kafka", sl.Err(err))
 							}
 						}()
