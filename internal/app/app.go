@@ -5,7 +5,9 @@ import (
 	"log/slog"
 	"love-signal-geo-data/internal/app/kafka"
 	"love-signal-geo-data/internal/config"
+	"love-signal-geo-data/internal/infrastructure/storage/postgresql"
 	"love-signal-geo-data/internal/usecase/coordinates"
+	"love-signal-geo-data/pkg/logger/sl"
 	"os"
 	"os/signal"
 	"syscall"
@@ -15,6 +17,7 @@ import (
 type App struct {
 	log      *slog.Logger
 	kafkaApp *kafka.App
+	storage  *postgresql.Storage
 }
 
 // New creates a new application.
@@ -22,6 +25,13 @@ func New(
 	log *slog.Logger,
 	cfg *config.Config,
 ) *App {
+	storage, err := postgresql.New(cfg.PostgreSQL)
+	if err != nil {
+		log.Error("error connecting to the PostgreSQL database", sl.Err(err))
+
+		panic(err)
+	}
+
 	// Use-cases.
 	userCoordinatesUseCase := coordinates.New(log)
 
@@ -31,6 +41,7 @@ func New(
 	return &App{
 		log:      log,
 		kafkaApp: kafkaApp,
+		storage:  storage,
 	}
 }
 
@@ -61,4 +72,5 @@ func (a *App) GracefulStop() {
 	log.Info("stopping application")
 
 	a.kafkaApp.Stop()
+	a.storage.Close()
 }

@@ -4,3 +4,5 @@ kafka:
   user_coordinates_topic:
     group_id: 'user-coordinates'
     topic: 'user-geo-data'
+postgresql:
+  url: 'host=localhost port=5432 dbname=lumiere_dev user=postgres password=postgres sslmode=disable'

@@ -9,8 +9,9 @@ import (
 
 // Config is the project configuration.
 type Config struct {
-	Env   string      `yaml:"env" env-default:"local"`
-	Kafka KafkaConfig `yaml:"kafka" env-required:"true"`
+	Env        string           `yaml:"env" env-default:"local"`
+	Kafka      KafkaConfig      `yaml:"kafka" env-required:"true"`
+	PostgreSQL PostgreSQLConfig `yaml:"postgresql" env-required:"true"`
 }
 
 // KafkaConfig is the kafka configuration.
@@ -23,6 +24,11 @@ type KafkaConfig struct {
 type TopicConfig struct {
 	GroupID string `yaml:"group_id" env-required:"true"`
 	Topic   string `yaml:"topic" env-required:"true"`
+}
+
+// PostgreSQLConfig is the PostgreSQL connection configuration.
+type PostgreSQLConfig struct {
+	URL string `yaml:"url" env-required:"true"`
 }
 
 // MustLoad loads config and panics if any error occurs.
