@@ -67,9 +67,10 @@ func (a *App) Start(ctx context.Context) {
 	a.kafkaApp.Start(ctx)
 
 	go func() {
+		output := a.kafkaApp.Output()
 		for {
 			select {
-			case msg := <-a.kafkaApp.Output():
+			case msg := <-output:
 				log.Info("received message from kafka", slog.String("topic", msg.Topic))
 
 				switch msg.Topic {
