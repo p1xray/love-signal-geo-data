@@ -5,8 +5,6 @@ import (
 	"love-signal-geo-data/pkg/kafka"
 )
 
-const event = "users-nearby"
-
 // UsersNearby is a handler for detected nearby users.
 type UsersNearby struct {
 	log                *slog.Logger
@@ -22,7 +20,7 @@ func NewUsersNearby(log *slog.Logger, receiveDataChannel chan<- kafka.Message) *
 }
 
 // SendToKafka sends detected nearby users data to kafka.
-func (un *UsersNearby) SendToKafka() error {
+func (un *UsersNearby) SendToKafka(userIDs []int64) error {
 	// TODO: implement this.
 
 	return nil

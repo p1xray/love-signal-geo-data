@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"log/slog"
 	"love-signal-geo-data/internal/config"
-	"love-signal-geo-data/internal/infrastructure/kafka/handlers"
 	"love-signal-geo-data/pkg/kafka"
 	"love-signal-geo-data/pkg/logger/sl"
 	"strings"
+	"sync"
 )
 
 // App is a kafka queue application.
@@ -17,15 +17,12 @@ type App struct {
 	producer  *kafka.Producer
 	consumers []*kafka.Consumer
 	input     chan kafka.Message
-
-	userCoordinatesHandler UserCoordinatesHandler
 }
 
 // New returns new instance of kafka queue application.
 func New(
 	log *slog.Logger,
 	cfg config.KafkaConfig,
-	userCoordinatesHandler UserCoordinatesHandler,
 ) *App {
 	address := strings.Split(cfg.Address, ",")
 
@@ -39,11 +36,10 @@ func New(
 	)
 
 	return &App{
-		log:                    log,
-		producer:               producer,
-		consumers:              []*kafka.Consumer{userCoordinatesConsumer},
-		input:                  make(chan kafka.Message),
-		userCoordinatesHandler: userCoordinatesHandler,
+		log:       log,
+		producer:  producer,
+		consumers: []*kafka.Consumer{userCoordinatesConsumer},
+		input:     make(chan kafka.Message),
 	}
 }
 
@@ -67,6 +63,11 @@ func (a *App) Input() chan<- kafka.Message {
 	return a.input
 }
 
+// Output is the output channel for processing the received data.
+func (a *App) Output() <-chan kafka.Message {
+	return a.mergeConsumersOutput()
+}
+
 // Stop - stops the kafka queue application.
 func (a *App) Stop() {
 	const op = "kafka.app.Stop"
@@ -86,7 +87,6 @@ func (a *App) startConsumers(ctx context.Context) {
 		go c.Consume(ctx)
 	}
 
-	a.handleConsumerReceivedMessages(ctx)
 	a.handleConsumerErrors()
 }
 
@@ -121,33 +121,31 @@ func (a *App) stopProducer(log *slog.Logger) {
 	}
 }
 
-func (a *App) handleConsumerReceivedMessages(ctx context.Context) {
-	const op = "kafka.app.handleConsumerReceivedMessages"
-
-	log := a.log.With(slog.String("op", op))
+func (a *App) mergeConsumersOutput() <-chan kafka.Message {
+	out := make(chan kafka.Message)
+	wg := &sync.WaitGroup{}
 
 	for _, consumer := range a.consumers {
-		go func() {
-			for {
-				select {
-				case msg := <-consumer.Output():
-					log.Info("received message from kafka", slog.String("topic", msg.Topic))
+		if consumer == nil {
+			continue
+		}
 
-					switch msg.Topic {
-					case handlers.UserCoordinatesTopic:
-						go func() {
-							if err := a.userCoordinatesHandler.Execute(ctx, msg.Data); err != nil {
-								log.Error("error handling new user coordinates from kafka", sl.Err(err))
-							}
-						}()
-					default:
-						log.Warn("handler implementation for topic does not exist", slog.String("topic", msg.Topic))
-					}
-				default:
-				}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			for v := range consumer.Output() {
+				out <- v
 			}
 		}()
 	}
+
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+
+	return out
 }
 
 func (a *App) handleConsumerErrors() {
