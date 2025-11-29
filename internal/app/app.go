@@ -3,12 +3,12 @@ package app
 import (
 	"context"
 	"log/slog"
-	"love-signal-geo-data/internal/app/kafka"
+	appKafka "love-signal-geo-data/internal/app/kafka"
 	"love-signal-geo-data/internal/config"
-	infrKafka "love-signal-geo-data/internal/infrastructure/kafka"
 	"love-signal-geo-data/internal/infrastructure/kafka/handlers"
 	"love-signal-geo-data/internal/infrastructure/repository"
 	"love-signal-geo-data/internal/infrastructure/storage/postgresql"
+	interactionKafka "love-signal-geo-data/internal/interaction/kafka"
 	"love-signal-geo-data/internal/usecase/coordinates"
 	"love-signal-geo-data/pkg/logger/sl"
 	"os"
@@ -19,9 +19,10 @@ import (
 // App is an application.
 type App struct {
 	log                    *slog.Logger
-	kafkaApp               *kafka.App
+	kafkaApp               *appKafka.App
 	storage                *postgresql.Storage
 	processUserCoordinates *coordinates.UseCase
+	kafkaReceiver          *interactionKafka.Receiver
 }
 
 // New creates a new application.
@@ -41,19 +42,26 @@ func New(
 	coordinatesStorage := repository.NewCoordinatesRepository(log, storage)
 
 	// Apps.
-	kafkaApp := kafka.New(log, cfg.Kafka)
+	kafkaApp := appKafka.New(log, cfg.Kafka)
+
+	// Kafka senders.
+	kafkaSender := interactionKafka.NewSender(log, kafkaApp.Input())
 
 	// Handlers.
-	usersNearbyHandler := handlers.NewUsersNearby(log, kafkaApp.Input())
+	usersNearbyHandler := handlers.NewUsersNearby(log, kafkaSender)
 
 	// Use-cases.
 	processUserCoordinates := coordinates.New(log, coordinatesStorage, usersNearbyHandler)
+
+	// Kafka receivers.
+	kafkaReceiver := interactionKafka.NewReceiver(log, kafkaApp.Output(), processUserCoordinates)
 
 	return &App{
 		log:                    log,
 		kafkaApp:               kafkaApp,
 		storage:                storage,
 		processUserCoordinates: processUserCoordinates,
+		kafkaReceiver:          kafkaReceiver,
 	}
 }
 
@@ -65,28 +73,7 @@ func (a *App) Start(ctx context.Context) {
 	log.Info("starting application")
 
 	a.kafkaApp.Start(ctx)
-
-	go func() {
-		output := a.kafkaApp.Output()
-		for {
-			select {
-			case msg := <-output:
-				log.Info("received message from kafka", slog.String("topic", msg.Topic))
-
-				switch msg.Topic {
-				case infrKafka.UserCoordinatesTopic:
-					go func() {
-						if err := a.processUserCoordinates.Execute(ctx, msg.Data); err != nil {
-							log.Error("error handling new user coordinates from kafka", sl.Err(err))
-						}
-					}()
-				default:
-					log.Warn("handler implementation for topic does not exist", slog.String("topic", msg.Topic))
-				}
-			default:
-			}
-		}
-	}()
+	a.kafkaReceiver.Receive(ctx)
 }
 
 // GracefulStop - gracefully stops the application.
