@@ -3,7 +3,6 @@ package kafka
 import (
 	"context"
 	"log/slog"
-	infrKafka "love-signal-geo-data/internal/infrastructure/kafka"
 	"love-signal-geo-data/pkg/kafka"
 	"love-signal-geo-data/pkg/logger/sl"
 )
@@ -54,7 +53,7 @@ func (r *Receiver) processMessage(ctx context.Context, log *slog.Logger, msg kaf
 	switch msg.Topic {
 	case "":
 		return
-	case infrKafka.UserCoordinatesTopic:
+	case UserCoordinatesTopic:
 		go func() {
 			if err := r.processUserCoordinates.Execute(ctx, msg.Data); err != nil {
 				log.Error("error handling new user coordinates from kafka", sl.Err(err))
