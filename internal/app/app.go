@@ -77,7 +77,7 @@ func (a *App) Start(ctx context.Context) {
 }
 
 // GracefulStop - gracefully stops the application.
-func (a *App) GracefulStop() {
+func (a *App) GracefulStop(cancel context.CancelFunc) {
 	const op = "app.GracefulStop"
 
 	log := a.log.With(slog.String("op", op))
@@ -92,6 +92,7 @@ func (a *App) GracefulStop() {
 
 	log.Info("stopping application")
 
+	cancel()
 	a.kafkaApp.Stop()
 	a.storage.Close()
 }

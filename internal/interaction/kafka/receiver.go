@@ -38,6 +38,8 @@ func (r *Receiver) Receive(ctx context.Context) {
 	go func() {
 		for {
 			select {
+			case <-ctx.Done():
+				return
 			case msg := <-r.output:
 				log.Info("received message from kafka", slog.String("topic", msg.Topic))
 
@@ -50,6 +52,8 @@ func (r *Receiver) Receive(ctx context.Context) {
 
 func (r *Receiver) processMessage(ctx context.Context, log *slog.Logger, msg kafka.Message) {
 	switch msg.Topic {
+	case "":
+		return
 	case infrKafka.UserCoordinatesTopic:
 		go func() {
 			if err := r.processUserCoordinates.Execute(ctx, msg.Data); err != nil {

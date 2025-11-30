@@ -2,6 +2,7 @@ package kafka
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"love-signal-geo-data/internal/config"
@@ -55,7 +56,7 @@ func (a *App) Start(ctx context.Context) {
 	a.startConsumers(ctx)
 
 	log.Info("running kafka producer")
-	a.startProducer()
+	a.startProducer(ctx)
 }
 
 // Input is the input channel for the user to write messages to that they wish to send.
@@ -87,7 +88,7 @@ func (a *App) startConsumers(ctx context.Context) {
 		go c.Consume(ctx)
 	}
 
-	a.handleConsumerErrors()
+	a.handleConsumerErrors(ctx)
 }
 
 func (a *App) stopConsumers(log *slog.Logger) {
@@ -98,7 +99,7 @@ func (a *App) stopConsumers(log *slog.Logger) {
 	}
 }
 
-func (a *App) startProducer() {
+func (a *App) startProducer(ctx context.Context) {
 	go func() {
 		for d := range a.input {
 			var key []byte
@@ -110,7 +111,7 @@ func (a *App) startProducer() {
 		}
 	}()
 
-	a.handleAsyncProducerErrors()
+	a.handleAsyncProducerErrors(ctx)
 }
 
 func (a *App) stopProducer(log *slog.Logger) {
@@ -148,7 +149,7 @@ func (a *App) mergeConsumersOutput() <-chan kafka.Message {
 	return out
 }
 
-func (a *App) handleConsumerErrors() {
+func (a *App) handleConsumerErrors(ctx context.Context) {
 	const op = "kafka.app.handleConsumerErrors"
 
 	log := a.log.With(slog.String("op", op))
@@ -157,8 +158,10 @@ func (a *App) handleConsumerErrors() {
 		go func() {
 			for {
 				select {
+				case <-ctx.Done():
+					return
 				case err := <-c.Notify():
-					if err != nil {
+					if err != nil && !errors.Is(err, context.Canceled) {
 						log.Error("error reading message from kafka", sl.Err(err))
 					}
 				default:
@@ -168,7 +171,7 @@ func (a *App) handleConsumerErrors() {
 	}
 }
 
-func (a *App) handleAsyncProducerErrors() {
+func (a *App) handleAsyncProducerErrors(ctx context.Context) {
 	const op = "kafka.app.handleAsyncProducerErrors"
 
 	log := a.log.With(slog.String("op", op))
@@ -176,8 +179,10 @@ func (a *App) handleAsyncProducerErrors() {
 	go func() {
 		for {
 			select {
+			case <-ctx.Done():
+				return
 			case err := <-a.producer.Notify():
-				if err != nil {
+				if err != nil && !errors.Is(err, context.Canceled) {
 					log.Error("error writing message to kafka", sl.Err(err))
 				}
 			default:

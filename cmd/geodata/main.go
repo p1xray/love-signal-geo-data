@@ -17,10 +17,12 @@ func main() {
 
 	application := app.New(log, cfg)
 
+	ctx, cancel := context.WithCancel(context.Background())
+
 	go func() {
-		application.Start(context.Background())
+		application.Start(ctx)
 	}()
 
-	application.GracefulStop()
+	application.GracefulStop(cancel)
 	log.Info("application stopped")
 }

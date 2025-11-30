@@ -41,27 +41,36 @@ func (c *Consumer) Consume(ctx context.Context) {
 	defer close(c.output)
 
 	for {
-		var msg kafka.Message
-		var err error
-		if c.autoCommitOffset {
-			msg, err = c.reader.ReadMessage(ctx)
-		} else {
-			msg, err = c.reader.FetchMessage(ctx)
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			c.consume(ctx)
 		}
-
-		if err != nil {
-			c.notify <- err
-		}
-
-		receivedMessage := Message{
-			Key:       string(msg.Key),
-			Topic:     msg.Topic,
-			Partition: msg.Partition,
-			Offset:    msg.Offset,
-			Data:      msg.Value,
-		}
-		c.output <- receivedMessage
 	}
+}
+
+func (c *Consumer) consume(ctx context.Context) {
+	var msg kafka.Message
+	var err error
+	if c.autoCommitOffset {
+		msg, err = c.reader.ReadMessage(ctx)
+	} else {
+		msg, err = c.reader.FetchMessage(ctx)
+	}
+
+	if err != nil {
+		c.notify <- err
+	}
+
+	receivedMessage := Message{
+		Key:       string(msg.Key),
+		Topic:     msg.Topic,
+		Partition: msg.Partition,
+		Offset:    msg.Offset,
+		Data:      msg.Value,
+	}
+	c.output <- receivedMessage
 }
 
 // Confirm confirms that the message was processed successfully.
